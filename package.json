@@ -1,0 +1,26 @@
+{
+  "name": "node_application",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "serve": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@elastic/elasticsearch": "7.10.0",
+    "@faker-js/faker": "7.6.0",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.4.2",
+    "mongodb": "^5.3.0",
+    "mysql": "^2.18.1",
+    "mysql2": "^3.12.0",
+    "nodemon": "^3.1.9",
+    "restify": "^11.1.0",
+    "uuid": "9.0.1"
+  }
+}
