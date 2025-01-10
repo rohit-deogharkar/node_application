@@ -1,0 +1,18 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "xprotocol",
+                "enableSsl": "Disabled"
+            },
+            "server": "localhost",
+            "port": 33060,
+            "driver": "MySQL",
+            "name": "localhost",
+            "database": "node_application",
+            "username": "root",
+            "password": "rohit",
+            "connectionTimeout": 30
+        }
+    ]
+}
