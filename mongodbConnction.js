@@ -1,14 +1,18 @@
 const { MongoClient } = require("mongodb");
+const dotenv = require("dotenv");
 
-const url = "mongodb://localhost:27017/";
+dotenv.config();
+
+const url = process.env.MONGO_URI;
 const client = new MongoClient(url);
+const collection = {};
 
 const mongodbConnection = async () => {
   try {
     await client.connect();
     const database = client.db("node_application");
-    const collection = database.collection("na_collection");
-    // console.log("Connected to MongoDB");
+    collection.users = database.collection("na_collection");
+    collection.logger = database.collection("logger_report");
     return collection;
   } catch (error) {
     console.log("Error connecting to MongoDB", error);

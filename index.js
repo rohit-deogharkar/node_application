@@ -9,6 +9,8 @@ const { Client } = require("@elastic/elasticsearch");
 
 const mongodbConnection = require("./mongodbConnction.js");
 const connection = require("./mysqlconnection.js");
+const newFunc = require("./util.js");
+
 // const {
 //   getFunctionelastic,
 //   createFunctionelastic,
@@ -24,8 +26,56 @@ dotenv.config();
 server.use(bodyParser.json());
 
 server.get("/mysql/get", async function (req, res) {
-  const result = await connection.query("SELECT * FROM users LIMIT 10");
-  res.send(result);
+  // const result = await connection.query("SELECT * FROM users LIMIT 10");
+  // res.send(result);
+
+  const [results, fields] = await connection.query(
+    "SELECT * FROM logger_report limit 10"
+  );
+  res.send(results);
+});
+
+server.get("/mysql/get/summarize/:condition", async (req, res) => {
+  const condition = req.params.condition;
+
+  if (condition == "hourly") {
+    const [results, fields] = await connection.query(`select 
+    date(callstart) as date,
+    time(callstart) as hour, 
+    count(callid) as total_calls,
+    sum(duration) as total_duration,
+    sum(call_time) as total_call_time, 
+    sum(hold) as total_hold_time, 
+    sum(mute) as total_mute_time, 
+    sum(transfer_time) as total_transfer_time, 
+    sum(conference) as total_conference_time,
+    sum(ringing) as total_ringing_time 
+    from logger_report 
+    group by 
+    hour(callstart);
+    `);
+    res.send(results);
+  }
+  if (condition == "agentwise") {
+    const [results, fields] = await connection.query(`select
+      date(callstart) as date,
+      agentname,
+      count(callid) as total_calls,
+      sum(duration) as total_duration,
+      sum(call_time) as total_call_time, 
+      sum(hold) as total_hold_time, 
+      sum(mute) as total_mute_time, 
+      sum(transfer_time) as total_transfer_time, 
+      sum(conference) as total_conference_time,
+      sum(ringing) as total_ringing_time 
+      from logger_report 
+      group by 
+      agentname
+      order by
+      agentname;
+      `);
+    res.send(results);
+  }
 });
 
 server.post("/mysql/create", async (req, res) => {
@@ -111,211 +161,22 @@ server.del("/redis/delete/:name", async (req, res) => {
 });
 
 server.get("/elasticsearch/get", async (req, res) => {
-  const { body } = await client.search({ index: "doyaroya" });
-  res.send(body);
+  const result = await client.search({ index: "rohit_logger_report" });
+  // res.send(body);
+  console.log(result);
+  res.send(result);
 });
 
 server.post("/elasticsearch/create", async (req, res) => {
   // const index = req.body.username;
 });
 
-var calltype = ["missed", "auto-failed", "auto-drop", "dispose"];
-var dispose_type = ["callback", "dnc", "etx"];
-var dispose_name = ["followup", "do not call", "external transfer"];
-var reasons = [
-  "busy everywhere",
-  "decline",
-  "does not exist anywhere",
-  "not acceptable",
-];
-var agentname = [
-  "rohit",
-  "sahil",
-  "anupam",
-  "ajay",
-  "pradeep",
-  "lakshadweep",
-  "ayush",
-];
-var campaign_name = ["transactions", "securities"];
-var process_name = [
-  "collections",
-  "fund transfers",
-  "watchable",
-  "allocations",
-];
+async function insertFunction(newCall) {
+  const resultelastic = client.index({
+    index: "rohit_logger_report",
+    body: newCall,
+  });
 
-var states = ["hold", "mute", "conference"];
-
-var ringingState = "ringing";
-var callState = "call";
-var transferState = "transfer";
-
-function checkCallTypeSetDispose(calltype) {
-  var disposedata = {};
-  // data["states"] = getRandomState(calltype);
-  if (calltype === "dispose") {
-    disposedata["dispose_name"] = faker.helpers.arrayElement(dispose_name);
-    if (disposedata["dispose_name"] === "followup") {
-      disposedata["dispose_type"] = "callback";
-    } else if (disposedata["dispose_name"] === "do not call") {
-      disposedata["dispose_type"] = "dnc";
-    }
-    if (disposedata["dispose_name"] === "external transfer") {
-      disposedata["dispose_type"] = "etx";
-    }
-  }
-  if (calltype === "missed") {
-    disposedata["dispose_name"] = "agent not found";
-  }
-  if (calltype == "auto-failed" || calltype == "auto-drop") {
-    disposedata["dispose_name"] = faker.helpers.arrayElement(reasons);
-  }
-  return disposedata;
-}
-
-function getRandomState(calltype) {
-  var randomstates = [];
-  var disposedata = checkCallTypeSetDispose(calltype);
-  if (
-    calltype == "missed" ||
-    calltype == "auto-failed" ||
-    calltype == "auto-drop"
-  ) {
-    randomstates.push(ringingState, "");
-  } else {
-    if (disposedata.dispose_type === "etx") {
-      randomstates.push(transferState);
-    }
-    for (i = 1; i <= Math.floor(Math.random() * 2) + 1; i++) {
-      randomstates.push(states[Math.floor(Math.random() * states.length)]);
-    }
-    randomstates.push(callState, ringingState);
-  }
-
-  var timedRandomStates = addSecondsToState(randomstates);
-  disposedata["states"] = timedRandomStates;
-  return disposedata;
-}
-
-function addSecondsToState(randomstates) {
-  var newTimedStates = {};
-  if (!randomstates == "") {
-    // randomstates.forEach((element) => {
-    //   if (element == "conference") {
-    //     newTimedStates[element] = Math.floor(Math.random() * 120) + 1;
-    //   }
-    //   if (element == "call") {
-    //     newTimedStates[element] = Math.floor(Math.random() * 300) + 100;
-    //   }
-    //   if (element == "") {
-    //     newTimedStates[element] = 0;
-    //   } else {
-    //     newTimedStates[element] = Math.floor(Math.random() * 20) + 1;
-    //   }
-    // });
-
-    for (i = 0; i < randomstates.length; i++) {
-      if (randomstates[i] == "call") {
-        newTimedStates[randomstates[i]] = Math.floor(Math.random() * 300) + 100;
-      }
-      if (randomstates[i] == "conference") {
-        newTimedStates[randomstates[i]] = Math.floor(Math.random() * 120) + 1;
-      }
-      if (randomstates[i] == "") {
-        newTimedStates[randomstates[i]] = 0;
-      } else {
-        newTimedStates[randomstates[i]] = Math.floor(Math.random() * 20) + 1;
-      }
-    }
-  }
-  return newTimedStates;
-}
-
-function addAllStates(calltype) {
-  var disposedata = getRandomState(calltype);
-  disposedata["calltype"] = calltype;
-  // console.log(data);
-  // data.states.forEach((element) => {
-  //   totalCallTime += element;
-  // });
-  // return totalCallTime;
-  var onlystates = Object.values(disposedata.states);
-  var totalCallTime = 0;
-  // onlystates.forEach((element) => {
-  //   if(element == 'ringing'){
-  //     continue
-  //   }
-  //
-  // });
-  var onlykey = Object.keys(disposedata.states);
-
-  for (i = 0; i < onlystates.length; i++) {
-    if (onlykey[i] === "ringing") {
-      continue;
-    }
-    totalCallTime += onlystates[i];
-  }
-  disposedata["totalCallTime"] = totalCallTime;
-  console.log(onlystates);
-  // console.log(onlystates);
-  // console.log(data.states)
-  // return disposedata
-  // console.log(disposedata);
-  return disposedata;
-}
-// addAllStates("dispose");
-// var newd = Math.floor(Math.random() * 300) + 200;
-// console.log(newd);
-// console.log(data);
-
-async function newFunc() {
-  // function createRandomUser() {
-  //   return {
-  //     username: faker.internet.userName(),
-  //     email: faker.internet.email(),
-  //     password: faker.internet.password(),
-  //     registeredAt: Date.now(),
-  //   };
-  // }
-  // var dispose = dispose_type[Math.floor(Math.random() * dispose_type.length)];
-  // console.log(dispose);
-  //
-  // setInterval(async () => {
-  //   let newuser = createRandomUser();
-  //   const result = await client.index({
-  //     index: "doyaroya",
-  //     body: newuser,
-  //   });
-
-  var newCall = {};
-  // newCall["calltype"] = ;
-  var alldata = addAllStates(
-    calltype[Math.floor(Math.random() * calltype.length)]
-  );
-  // console.log(alldata);
-  newCall["callstart"] = new Date();
-  newCall["calltype"] = alldata.calltype;
-  newCall["dispose_type"] = alldata.dispose_type;
-  newCall["dispose_name"] = alldata.dispose_name;
-  newCall["duration"] = alldata.totalCallTime;
-  newCall["agentname"] = faker.helpers.arrayElement(agentname);
-  newCall["campaign_name"] = faker.helpers.arrayElement(campaign_name);
-  newCall["process_name"] = faker.helpers.arrayElement(process_name);
-  newCall["leadset"] = Math.floor(Math.random() * 10) + 1;
-  newCall["reference_uuid"] = uuidv4();
-  newCall["customer_uuid"] = uuidv4();
-  newCall["hold"] = alldata.states.hold;
-  newCall["mute"] = alldata.states.mute;
-  newCall["ringing"] = alldata.states.ringing;
-  newCall["conference"] = alldata.states.conference;
-  newCall["transfer"] = alldata.states.transfer;
-  newCall["call"] = alldata.states.call;
-  newCall["dispose_time"] = alldata.states.call
-    ? Math.floor(Math.random() * 10) + 1
-    : 0;
-
-  console.log(newCall);
   const resultmysql = await connection.query(
     "INSERT INTO logger_report (callstart,call_type,dispose_name,dispose_type,duration,agentname,campaign_name,process_name,leadset_id,reference_uuid,customer_uuid,hold,mute,ringing,transfer_time,conference,call_time,dispose_time)  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     [
@@ -339,16 +200,14 @@ async function newFunc() {
       newCall.dispose_time,
     ]
   );
+  const collection = await mongodbConnection();
+  const resultmongodb = await collection.logger.insertOne(newCall);
 }
 
-setInterval(() => {
-  newFunc();
-}, 1000);
-
-// function addSeconds(date, seconds) {
-//   date.setSeconds(date.getSeconds() + seconds);
-//   return date;
-// }
+// setInterval(async () => {
+//   const newCall = await newFunc();
+//   insertFunction(newCall);
+// }, 6000);
 
 server.put("/elasticsearch/update/:id", async (req, res) => {
   const id = req.params.id;
