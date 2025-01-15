@@ -108,6 +108,29 @@ server.get("/mongodb/get", async (req, res) => {
   res.send(result);
 });
 
+server.get("/mongodb/get/summarize", async (req, res) => {
+  const collection = await mongodbConnection();
+  const result = await collection.logger
+    .aggregate([
+      {
+        $group: {
+          _id: { hour: { $hour: "$callstart" } },
+          total_calls: { $sum: 1 },
+          total_ringing_time: { $sum: "$ringing" },
+          total_duration: { $sum: "$duration" },
+          total_call_time: { $sum: "$call" },
+          total_hold_time: { $sum: "$hold" },
+          total_mute_time: { $sum: "$mute" },
+          total_transfer_time: { $sum: "$transfer" },
+          total_conference_time: { $sum: "$conference" },
+        },
+      },
+      { $sort: { "_id.hour": 1 } },
+    ])
+    .toArray();
+  res.send(result);
+});
+
 server.post("/mongodb/create", async (req, res) => {
   const { username, email, password } = req.body;
   const collection = await mongodbConnection();
@@ -165,6 +188,68 @@ server.get("/elasticsearch/get", async (req, res) => {
   // res.send(body);
   console.log(result);
   res.send(result);
+});
+
+server.get("/elasticsearch/get/summarize", async (req, res) => {
+  try {
+    const result = await client.search({
+      index: "rohit_logger_report",
+      body: {
+        size: 0,
+        aggs: {
+          hour: {
+            date_histogram: {
+              field: "callstart",
+              calendar_interval: "hour",
+            },
+            aggs: {
+              total_duration: {
+                sum: {
+                  field: "duration",
+                },
+              },
+              total_call_time: {
+                sum: {
+                  field: "call",
+                },
+              },
+              total_hold_time: {
+                sum: {
+                  field: "hold",
+                },
+              },
+              total_mute_time: {
+                sum: {
+                  field: "mute",
+                },
+              },
+              total_transfer_time: {
+                sum: {
+                  field: "transfer",
+                },
+              },
+              total_conference_time: {
+                sum: {
+                  field: "conference",
+                },
+              },
+              total_ringing_time: {
+                sum: {
+                  field: "ringing",
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // res.send(body);
+    // console.log(result);
+    res.send(result.body.aggregations.hour.buckets);
+  } catch (err) {
+    console.log(err);
+  }
 });
 
 server.post("/elasticsearch/create", async (req, res) => {
