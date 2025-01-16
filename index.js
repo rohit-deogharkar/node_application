@@ -26,9 +26,6 @@ dotenv.config();
 server.use(bodyParser.json());
 
 server.get("/mysql/get", async function (req, res) {
-  // const result = await connection.query("SELECT * FROM users LIMIT 10");
-  // res.send(result);
-
   const [results, fields] = await connection.query(
     "SELECT * FROM logger_report limit 10"
   );
@@ -76,6 +73,39 @@ server.get("/mysql/get/summarize/:condition", async (req, res) => {
       `);
     res.send(results);
   }
+});
+
+server.get("/mysql/get/filter", async (req, res) => {
+  // const { fieldname, valuename } = req.body;
+  let staticvar = [
+    {
+      field: "agentname",
+      value: "rohit",
+    },
+    // {
+    //   field: "campaign_name",
+    //   value: "securities",
+    // },
+    // {
+    //   field: "process_name",
+    //   value: "collections",
+    // },
+  ];
+  let condition = "";
+  staticvar.map((e) => {
+    condition += `${e.field}="${e.value}" AND `;
+  });
+
+  let newArray = condition.split(" ");
+
+  newArray.pop();
+  newArray.pop();
+
+  let newCondition = newArray.join(" ");
+  
+  let query = `SELECT * FROM logger_report WHERE ${newCondition}`;
+  const [results, field] = await connection.query(query);
+  res.send(results);
 });
 
 server.post("/mysql/create", async (req, res) => {
@@ -185,9 +215,11 @@ server.del("/redis/delete/:name", async (req, res) => {
 
 server.get("/elasticsearch/get", async (req, res) => {
   const result = await client.search({ index: "rohit_logger_report" });
-  // res.send(body);
-  console.log(result);
-  res.send(result);
+  let response = [];
+  result.body.hits.hits.map((element) => {
+    response.push(element._source);
+  });
+  res.send(response);
 });
 
 server.get("/elasticsearch/get/summarize", async (req, res) => {
@@ -246,7 +278,18 @@ server.get("/elasticsearch/get/summarize", async (req, res) => {
 
     // res.send(body);
     // console.log(result);
-    res.send(result.body.aggregations.hour.buckets);
+    // res.send(result.body.aggregations.hour.buckets);
+    let newArray = result.body.aggregations.hour.buckets;
+    let response = {};
+    result.body.aggregations.hour.buckets.map((element) => {
+      res.send(element);
+      response[element] = 1;
+    });
+    let newKeys = Object.keys(newArray[1]);
+    for (i = 0; i < newKeys.length; i++) {
+      response[newKeys[i]] = 1;
+    }
+    res.send(response);
   } catch (err) {
     console.log(err);
   }
@@ -304,7 +347,6 @@ server.put("/elasticsearch/update/:id", async (req, res) => {
   });
   res.json(result);
 });
-
 server.del("/elasticsearch/delete/", async (req, res) => {
   const { index, id } = req.body;
   const result = await client.delete({
@@ -313,14 +355,6 @@ server.del("/elasticsearch/delete/", async (req, res) => {
   });
   res.send(result);
 });
-
-// createRandomUser();
-
-// users.forEach(element =>{
-// setInterval(() => {
-// console.log(users);
-// }, 100);
-// })
 
 server.get("/mysql/sumarrize", async (req, res) => {
   const result = await connection.query("");
