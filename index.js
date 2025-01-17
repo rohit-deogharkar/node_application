@@ -27,7 +27,7 @@ server.use(bodyParser.json());
 
 server.get("/mysql/get", async function (req, res) {
   const [results, fields] = await connection.query(
-    "SELECT * FROM logger_report limit 10"
+    "SELECT * FROM logger_report limit 30"
   );
   res.send(results);
 });
@@ -75,35 +75,18 @@ server.get("/mysql/get/summarize/:condition", async (req, res) => {
   }
 });
 
-server.get("/mysql/get/filter", async (req, res) => {
-  // const { fieldname, valuename } = req.body;
-  let staticvar = [
-    {
-      field: "agentname",
-      value: "rohit",
-    },
-    // {
-    //   field: "campaign_name",
-    //   value: "securities",
-    // },
-    // {
-    //   field: "process_name",
-    //   value: "collections",
-    // },
-  ];
-  let condition = "";
-  staticvar.map((e) => {
-    condition += `${e.field}="${e.value}" AND `;
+server.post("/mysql/get/filter", async (req, res) => {
+  const data = req.body;
+
+  let condition = [];
+
+  Object.keys(data).forEach((e) => {
+    condition.push([`${e} = "${data[e]}"`]);
   });
 
-  let newArray = condition.split(" ");
-
-  newArray.pop();
-  newArray.pop();
-
-  let newCondition = newArray.join(" ");
-  
-  let query = `SELECT * FROM logger_report WHERE ${newCondition}`;
+  console.log(condition);
+  let query = `SELECT * FROM logger_report WHERE ${condition.join(" AND ")}`;
+  console.log(query);
   const [results, field] = await connection.query(query);
   res.send(results);
 });
@@ -135,6 +118,13 @@ server.del("/mysql/delete/:id", async (req, res) => {
 server.get("/mongodb/get", async (req, res) => {
   const collection = await mongodbConnection();
   const result = await collection.find().toArray();
+  res.send(result);
+});
+
+server.post("/mongodb/get/filter", async (req, res) => {
+  let condition = req.body;
+  const collection = await mongodbConnection();
+  const result = await collection.logger.find(condition).toArray();
   res.send(result);
 });
 
@@ -276,20 +266,31 @@ server.get("/elasticsearch/get/summarize", async (req, res) => {
       },
     });
 
-    // res.send(body);
-    // console.log(result);
-    // res.send(result.body.aggregations.hour.buckets);
+    let resultarray = [];
     let newArray = result.body.aggregations.hour.buckets;
-    let response = {};
-    result.body.aggregations.hour.buckets.map((element) => {
-      res.send(element);
-      response[element] = 1;
+    newArray.map((e) => {
+      (hour = new Date(e.key_as_string).getHours()),
+        (total_calls = e.doc_count),
+        (total_confernce_time = e.total_conference_time.value),
+        (total_transfer_time = e.total_transfer_time.value),
+        (total_mute_time = e.total_mute_time.value),
+        (total_call_time = e.total_call_time.value),
+        (total_duration = e.total_duration.value),
+        (total_hold_time = e.total_hold_time.value),
+        (total_ringing_time = e.total_ringing_time.value),
+        resultarray.push({
+          hour,
+          total_calls,
+          total_duration,
+          total_ringing_time,
+          total_call_time,
+          total_hold_time,
+          total_mute_time,
+          total_transfer_time,
+          total_confernce_time,
+        });
     });
-    let newKeys = Object.keys(newArray[1]);
-    for (i = 0; i < newKeys.length; i++) {
-      response[newKeys[i]] = 1;
-    }
-    res.send(response);
+    res.send(result);
   } catch (err) {
     console.log(err);
   }
